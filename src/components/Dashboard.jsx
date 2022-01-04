@@ -186,7 +186,7 @@ function Dashboard() {
 	const handleDateChange = (e, { amount, unit }) => {
 		setSearchParams({
 			filter: searchParams.get("filter"),
-			page: searchParams.get("page"),
+			page: 1,
 			start: dayjs().subtract(amount, unit).format("YYYY-MM-DD"),
 			end: dayjs().format("YYYY-MM-DD"),
 		});
@@ -201,7 +201,7 @@ function Dashboard() {
 		if (i === 0) {
 			setSearchParams({
 				filter: searchParams.get("filter"),
-				page: searchParams.get("page"),
+				page: 1,
 				start: searchParams.get("start"),
 				end: dayjs(newValue).format("YYYY-MM-DD"),
 			});
@@ -212,7 +212,7 @@ function Dashboard() {
 		} else if (i === 1) {
 			setSearchParams({
 				filter: searchParams.get("filter"),
-				page: searchParams.get("page"),
+				page: 1,
 				start: dayjs(newValue).format("YYYY-MM-DD"),
 				end: searchParams.get("end"),
 			});
