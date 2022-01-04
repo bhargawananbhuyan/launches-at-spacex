@@ -1,14 +1,12 @@
-// utils
-import { useEffect, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import axios from "axios";
-import dayjs from "dayjs";
-import DateAdapter from "@mui/lab/AdapterDayjs";
-
-// UI stuff
-import { CalendarToday, ExpandMore, FilterAlt } from "@mui/icons-material";
+import {
+	CalendarToday,
+	Close,
+	ExpandMore,
+	FilterAlt,
+	YouTube,
+} from "@mui/icons-material";
 import { LocalizationProvider, StaticDatePicker } from "@mui/lab";
-import { Box } from "@mui/system";
+import DateAdapter from "@mui/lab/AdapterDayjs";
 import {
 	Button,
 	Chip,
@@ -16,6 +14,8 @@ import {
 	Container,
 	Dialog,
 	DialogContent,
+	DialogTitle,
+	IconButton,
 	MenuItem,
 	Pagination,
 	Paper,
@@ -25,7 +25,13 @@ import {
 	TableHead,
 	TableRow,
 	TextField,
+	Typography,
 } from "@mui/material";
+import { Box } from "@mui/system";
+import axios from "axios";
+import dayjs from "dayjs";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
 	StyledDateFilter,
 	StyledError,
@@ -38,7 +44,9 @@ import {
 const url = "https://api.spacexdata.com/v3/launches";
 
 function Dashboard() {
+	const navigate = useNavigate();
 	const [searchParams, setSearchParams] = useSearchParams();
+
 	let [pagination, setPagination] = useState({
 		loading: false,
 		count: 0,
@@ -51,12 +59,44 @@ function Dashboard() {
 	});
 
 	let [openDate, setOpenDate] = useState(false);
-	let [date, setDate] = useState([null, null]); // to be removed and instead we'll use searchParams
-	let [dateFilterText, setDateFilterText] = useState("All time");
+	let [dateFilterText, setDateFilterText] = useState("");
+	let [openDetails, setOpenDetails] = useState(false);
+	let [details, setDetails] = useState({});
 
 	useEffect(() => {
+		navigate(
+			`?filter=${searchParams.get("filter") || "all"}&page=${
+				searchParams.get("page") || 1
+			}
+			&start=${searchParams.get("start") || null}&end=${
+				searchParams.get("end") || null
+			}`
+		);
+
+		const start = searchParams.get("start");
+		const end = searchParams.get("end");
+
+		if (start === "null" && end === "null") setDateFilterText("All time");
+		else if (dayjs(end).diff(dayjs(start), "day") === 7)
+			setDateFilterText("Past week");
+		else if (dayjs(end).diff(dayjs(start), "month") === 1)
+			setDateFilterText("Past month");
+		else if (dayjs(end).diff(dayjs(start), "month") === 3)
+			setDateFilterText("Past 3 months");
+		else if (dayjs(end).diff(dayjs(start), "month") === 6)
+			setDateFilterText("Past 6 months");
+		else if (dayjs(end).diff(dayjs(start), "year") === 1)
+			setDateFilterText("Past year");
+		else if (dayjs(end).diff(dayjs(start), "year") === 2)
+			setDateFilterText("Past 2 years");
+	}, [searchParams, navigate]);
+
+	useEffect(() => {
+		// function to handle pagination
 		(async () => {
 			const filter = searchParams.get("filter");
+			const start = searchParams.get("start");
+			const end = searchParams.get("end");
 
 			setPagination((prevState) => ({ ...prevState, loading: true }));
 
@@ -68,7 +108,21 @@ function Dashboard() {
 							: filter === "failure"
 							? "?launch_success=false"
 							: ""
-					}`
+					}${
+						start &&
+						start !== "null" &&
+						end &&
+						end !== "null" &&
+						(!filter || filter === "all" || filter === "upcoming")
+							? `?start=${start}&end=${end}`
+							: start && start !== "null" && end && end !== "null"
+							? `&start=${start}&end=${end}`
+							: ""
+					}`,
+					{
+						timeout: 1000 * 10, // 10s
+						timeoutErrorMessage: "Request time out",
+					}
 				);
 				const resData = await res.data;
 				const pageCount = Math.ceil(resData.length / 12);
@@ -77,26 +131,18 @@ function Dashboard() {
 				setPagination({ loading: false, count: 0, error: error.message });
 			}
 		})();
-	}, [searchParams, date]);
 
-	const navigate = useNavigate();
-	useEffect(() => {
-		navigate(
-			`?filter=${searchParams.get("filter") || "all"}&page=${
-				searchParams.get("page") || 1
-			}`
-		);
-	}, [searchParams]);
-
-	useEffect(() => {
+		// function to handle api data
 		(async () => {
 			const filter = searchParams.get("filter");
+			const start = searchParams.get("start");
+			const end = searchParams.get("end");
 
 			setApiData((prevState) => ({ ...prevState, loading: true }));
 			try {
 				const res = await axios.get(
 					`${url}${filter === "upcoming" ? "/upcoming" : ""}?offset=${
-						(parseInt(searchParams.get("page")) - 1) * 12
+						(parseInt(searchParams.get("page")) - 1) * 12 || 0
 					}&limit=12${
 						filter === "success"
 							? "&launch_success=true"
@@ -104,10 +150,14 @@ function Dashboard() {
 							? "&launch_success=false"
 							: ""
 					}${
-						date[0] !== null && date[1] !== null
-							? `&start=${date[0]}&end=${date[1]}`
+						start && start !== "null" && end && end !== "null"
+							? `&start=${start}&end=${end}`
 							: ""
-					}`
+					}`,
+					{
+						timeout: 1000 * 10, // 10s
+						timeoutErrorMessage: "Request time out",
+					}
 				);
 				const resData = await res.data;
 				if (resData.length > 0) {
@@ -127,34 +177,44 @@ function Dashboard() {
 				});
 			}
 		})();
-	}, [searchParams, date]);
+	}, [searchParams]);
 
 	// function for handling date change (without calendar)
 	const handleDateChange = (e, { amount, unit }) => {
-		setDateFilterText(e.target.textContent);
-		setDate([
-			dayjs().subtract(amount, unit).format("YYYY-MM-DD"),
-			dayjs().format("YYYY-MM-DD"),
-		]);
+		setSearchParams({
+			filter: searchParams.get("filter"),
+			page: searchParams.get("page"),
+			start: dayjs().subtract(amount, unit).format("YYYY-MM-DD"),
+			end: dayjs().format("YYYY-MM-DD"),
+		});
 		setOpenDate(false);
 	};
 
 	// function to handle date change (with calendar)
 	const handleDateChange2 = (newValue, i) => {
+		const start = searchParams.get("start");
+		const end = searchParams.get("end");
+
 		if (i === 0) {
-			setDate((d) => [d[i], dayjs(newValue).format("YYYY-MM-DD")]);
+			setSearchParams({
+				filter: searchParams.get("filter"),
+				page: searchParams.get("page"),
+				start: searchParams.get("start"),
+				end: dayjs(newValue).format("YYYY-MM-DD"),
+			});
 			setDateFilterText(
-				`${!date[i] ? "" : `${date[i]} to`} ${dayjs(newValue).format(
-					"YYYY-MM-DD"
-				)}`
+				`${start ? `${start} to` : ""} ${dayjs(newValue).format("YYYY-MM-DD")}`
 			);
 			setOpenDate(false);
 		} else if (i === 1) {
-			setDate((d) => [dayjs(newValue).format("YYYY-MM-DD"), d[1]]);
+			setSearchParams({
+				filter: searchParams.get("filter"),
+				page: searchParams.get("page"),
+				start: dayjs(newValue).format("YYYY-MM-DD"),
+				end: searchParams.get("end"),
+			});
 			setDateFilterText(
-				`${dayjs(newValue).format("YYYY-MM-DD")} ${
-					!date[i] ? "" : `to ${date[i]}`
-				}`
+				`${dayjs(newValue).format("YYYY-MM-DD")} ${end ? `to ${end}` : ""}`
 			);
 		}
 	};
@@ -213,7 +273,15 @@ function Dashboard() {
 							!pagination.loading &&
 							apiData.data.length > 0 ? (
 								apiData.data.map((instance, i) => (
-									<TableRow key={i}>
+									<TableRow
+										key={i}
+										hover
+										sx={{ cursor: "pointer" }}
+										onClick={() => {
+											setOpenDetails(true);
+											setDetails(apiData.data[i]);
+										}}
+									>
 										<TableCell>{instance["flight_number"]}</TableCell>
 										<TableCell>
 											{dayjs(instance["launch_date_utc"]).format(
@@ -245,7 +313,7 @@ function Dashboard() {
 														? "upcoming"
 														: instance["launch_success"]
 														? "success"
-														: "failure"
+														: "failed"
 												}
 											/>
 										</TableCell>
@@ -302,7 +370,12 @@ function Dashboard() {
 						<StyledDateFilter>
 							<Button
 								onClick={(e) => {
-									setDate([null, null]);
+									setSearchParams({
+										filter: searchParams.get("filter"),
+										page: searchParams.get("page"),
+										start: null,
+										end: null,
+									});
 									setDateFilterText(e.target.textContent);
 									setOpenDate(false);
 								}}
@@ -344,7 +417,8 @@ function Dashboard() {
 							<LocalizationProvider dateAdapter={DateAdapter}>
 								<StaticDatePicker
 									displayStaticWrapperAs="desktop"
-									value={date[0]}
+									value={searchParams.get("start")}
+									minDate={dayjs("2000-01-01")}
 									onChange={(newValue) => handleDateChange2(newValue, 1)}
 									renderInput={(params) => <TextField {...params} />}
 								/>
@@ -352,13 +426,174 @@ function Dashboard() {
 							<LocalizationProvider dateAdapter={DateAdapter}>
 								<StaticDatePicker
 									displayStaticWrapperAs="desktop"
-									value={date[1]}
+									value={searchParams.get("end")}
+									minDate={dayjs("2000-01-01")}
 									onChange={(newValue) => handleDateChange2(newValue, 0)}
 									renderInput={(params) => <TextField {...params} />}
 								/>
 							</LocalizationProvider>
 						</Box>
 					</Box>
+				</DialogContent>
+			</Dialog>
+
+			{/* details dialog */}
+			<Dialog
+				open={openDetails}
+				onClose={() => setOpenDetails(false)}
+				maxWidth="sm"
+				fullWidth
+			>
+				<DialogTitle>
+					<IconButton
+						onClick={() => {
+							setOpenDetails(false);
+							setDetails({});
+						}}
+						sx={{ float: "right" }}
+					>
+						<Close />
+					</IconButton>
+				</DialogTitle>
+				<DialogContent>
+					{details && details.links && details.rocket && details.launch_site && (
+						<Box>
+							<Box sx={{ display: "flex", alignItems: "center" }}>
+								<img
+									src={details.links.mission_patch_small}
+									width={100}
+									height="auto"
+									alt={details.mission_name}
+									title={details.mission_name}
+								/>
+								<Box>
+									<Typography sx={{ ml: 3 }}>
+										<Box sx={{ display: "flex", alignItems: "center" }}>
+											<Typography
+												variant="h5"
+												sx={{ mr: 2, fontWeight: "bold" }}
+											>
+												{details.mission_name}
+											</Typography>
+											{details.upcoming ? (
+												<Chip label="Upcoming" color="warning" />
+											) : details.launch_success ? (
+												<Chip label="Success" color="success" />
+											) : (
+												<Chip label="Failed" color="error" />
+											)}
+										</Box>
+										<Box sx={{ mt: 1 }}>{details.rocket.rocket_name}</Box>
+									</Typography>
+									<Box sx={{ mt: 1.5, ml: 2.5, "& a": { mr: 1 } }}>
+										{details.links.article_link && (
+											<a
+												target={"_blank"}
+												rel="noreferrer"
+												href={details.links.article_link}
+											>
+												<img
+													src={"/assets/nasa.png"}
+													width={25}
+													height="auto"
+													alt=""
+												/>
+											</a>
+										)}
+										{details.links.wikipedia && (
+											<a
+												target={"_blank"}
+												rel="noreferrer"
+												href={details.links.wikipedia}
+											>
+												<img
+													src={"/assets/wikipedia.svg"}
+													width={25}
+													height="auto"
+													alt=""
+												/>
+											</a>
+										)}
+										{details.links.youtube && (
+											<a
+												target={"_blank"}
+												rel="noreferrer"
+												href={`https://www.youtube.com/watch?v=${details.links.youtube_id}`}
+											>
+												<YouTube />
+											</a>
+										)}
+									</Box>
+								</Box>
+							</Box>
+
+							<Typography sx={{ my: 3.5, px: 2 }}>
+								<span>{`${details.details ?? ""} `}</span>
+								{details.links.wikipedia && (
+									<a href={details.links.wikipedia}>Wikipedia</a>
+								)}
+							</Typography>
+
+							<Table>
+								<TableBody>
+									<TableRow>
+										<TableCell>Flight Number</TableCell>
+										<TableCell>{details.flight_number}</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell>Mission Name</TableCell>
+										<TableCell>{details.mission_name}</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell>Rocket Type</TableCell>
+										<TableCell>{details.rocket.rocket_type}</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell>Rocket Name</TableCell>
+										<TableCell>{details.rocket.rocket_name}</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell>Manufacturer</TableCell>
+										<TableCell>
+											{details.rocket.second_stage.payloads[0].manufacturer}
+										</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell>Nationality</TableCell>
+										<TableCell>
+											{details.rocket.second_stage.payloads[0].nationality}
+										</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell>Launch Date</TableCell>
+										<TableCell>
+											{dayjs(details.launch_date_utc).format(
+												"DD MMMM YYYY HH:mm"
+											)}
+										</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell>Payload Type</TableCell>
+										<TableCell>
+											{details.rocket.second_stage.payloads[0].payload_type}
+										</TableCell>
+									</TableRow>
+									<TableRow>
+										<TableCell>Orbit</TableCell>
+										<TableCell>
+											{details.rocket.second_stage.payloads[0].orbit}
+										</TableCell>
+									</TableRow>
+									<TableRow
+										sx={{ "& *": { border: "transparent !important" } }}
+									>
+										<TableCell>Launch Site</TableCell>
+										<TableCell>{details.launch_site.site_name}</TableCell>
+									</TableRow>
+								</TableBody>
+							</Table>
+						</Box>
+					)}
 				</DialogContent>
 			</Dialog>
 		</>
