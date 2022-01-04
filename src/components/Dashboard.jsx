@@ -356,6 +356,8 @@ function Dashboard() {
 							setSearchParams({
 								filter: searchParams.get("filter"),
 								page: newValue,
+								start: searchParams.get("start"),
+								end: searchParams.get("end"),
 							});
 						}}
 						variant="outlined"
