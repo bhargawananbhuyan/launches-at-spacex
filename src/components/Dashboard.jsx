@@ -89,6 +89,9 @@ function Dashboard() {
 			setDateFilterText("Past year");
 		else if (dayjs(end).diff(dayjs(start), "year") === 2)
 			setDateFilterText("Past 2 years");
+		else {
+			setDateFilterText(`${start} to ${end}`);
+		}
 	}, [searchParams, navigate]);
 
 	useEffect(() => {
