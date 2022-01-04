@@ -234,6 +234,8 @@ function Dashboard() {
 							setSearchParams({
 								filter: e.target.value,
 								page: 1,
+								start: searchParams.get("start"),
+								end: searchParams.get("end"),
 							});
 						}}
 						startAdornment={<FilterAlt />}
