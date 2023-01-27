@@ -475,7 +475,7 @@ function Dashboard() {
 								/>
 								<Box>
 									<Typography sx={{ ml: 3 }}>
-										<Box sx={{ display: "flex", alignItems: "center" }}>
+										<Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
 											<Typography
 												variant="h5"
 												sx={{ mr: 2, fontWeight: "bold" }}
